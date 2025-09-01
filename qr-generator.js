@@ -28,16 +28,32 @@ class AdvancedQRGenerator {
         ] : [0, 0, 0];
     }
 
+    // Convert RGB array to hex color
+    rgbToHex(r, g, b) {
+        return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+    }
+
+    // Invert a color
+    invertColor(hex) {
+        const rgb = this.hexToRgb(hex);
+        return this.rgbToHex(255 - rgb[0], 255 - rgb[1], 255 - rgb[2]);
+    }
+
     // Generate QR code with options
     async generateQR(data, options = {}) {
+        const foregroundColor = options.foregroundColor || '#000000';
+        const backgroundColorToUse = options.transparent ? 
+            this.invertColor(foregroundColor) : 
+            (options.backgroundColor || '#FFFFFF');
+
         const qrOptions = {
             errorCorrectionLevel: options.errorCorrection || 'M',
             type: 'png',
             quality: 0.92,
             margin: options.margin || 4,
             color: {
-                dark: options.foregroundColor || '#000000',
-                light: options.transparent ? '#FFFFFF' : (options.backgroundColor || '#FFFFFF')
+                dark: foregroundColor,
+                light: backgroundColorToUse
             },
             width: options.size || 300
         };
@@ -52,7 +68,7 @@ class AdvancedQRGenerator {
             
             // Apply transparency or advanced styling if requested
             if (options.transparent || (options.moduleShape && options.moduleShape !== 'square')) {
-                return await this.applyAdvancedStyling(buffer, options);
+                return await this.applyAdvancedStyling(buffer, options, backgroundColorToUse);
             }
             
             return buffer;
@@ -62,7 +78,7 @@ class AdvancedQRGenerator {
     }
 
     // Apply advanced styling including transparency and custom shapes  
-    async applyAdvancedStyling(buffer, options) {
+    async applyAdvancedStyling(buffer, options, actualBackgroundColor) {
         try {
             return new Promise((resolve, reject) => {
                 const png = new PNG();
@@ -75,6 +91,7 @@ class AdvancedQRGenerator {
                     
                     const { width, height } = data;
                     const foregroundRgb = this.hexToRgb(options.foregroundColor || '#000000');
+                    const backgroundRgb = this.hexToRgb(actualBackgroundColor);
                     
                     // Process each pixel
                     for (let y = 0; y < height; y++) {
@@ -85,35 +102,40 @@ class AdvancedQRGenerator {
                             const g = data.data[idx + 1]; 
                             const b = data.data[idx + 2];
                             
-                            // Determine if this is a QR module (dark) or background (light)
-                            // QR modules are typically black (0,0,0) and background is white (255,255,255)
-                            const isDarkPixel = (r + g + b) < 384; // Less than average of 128 per channel
+                            // Calculate distance to foreground and background colors
+                            const fgDistance = Math.sqrt(
+                                Math.pow(r - foregroundRgb[0], 2) + 
+                                Math.pow(g - foregroundRgb[1], 2) + 
+                                Math.pow(b - foregroundRgb[2], 2)
+                            );
                             
-                            if (isDarkPixel) {
+                            const bgDistance = Math.sqrt(
+                                Math.pow(r - backgroundRgb[0], 2) + 
+                                Math.pow(g - backgroundRgb[1], 2) + 
+                                Math.pow(b - backgroundRgb[2], 2)
+                            );
+                            
+                            // Determine if pixel is closer to foreground or background
+                            if (fgDistance < bgDistance) {
                                 // This is a QR module - set to foreground color and make opaque
                                 data.data[idx] = foregroundRgb[0];     // R
                                 data.data[idx + 1] = foregroundRgb[1]; // G
                                 data.data[idx + 2] = foregroundRgb[2]; // B
                                 data.data[idx + 3] = 255;             // A (opaque)
                             } else {
-                                // This is background - make transparent if requested
+                                // This is background
                                 if (options.transparent) {
+                                    // Make background pixels transparent
                                     data.data[idx] = 0;       // R
                                     data.data[idx + 1] = 0;   // G
                                     data.data[idx + 2] = 0;   // B
                                     data.data[idx + 3] = 0;   // A (transparent)
-                                } else if (options.backgroundColor) {
-                                    const bgRgb = this.hexToRgb(options.backgroundColor);
-                                    data.data[idx] = bgRgb[0];     // R
-                                    data.data[idx + 1] = bgRgb[1]; // G  
-                                    data.data[idx + 2] = bgRgb[2]; // B
-                                    data.data[idx + 3] = 255;     // A (opaque)
                                 } else {
-                                    // Keep original background (white)
-                                    data.data[idx] = 255;     // R
-                                    data.data[idx + 1] = 255; // G
-                                    data.data[idx + 2] = 255; // B
-                                    data.data[idx + 3] = 255; // A (opaque)
+                                    // Keep background color
+                                    data.data[idx] = backgroundRgb[0];     // R
+                                    data.data[idx + 1] = backgroundRgb[1]; // G  
+                                    data.data[idx + 2] = backgroundRgb[2]; // B
+                                    data.data[idx + 3] = 255;             // A (opaque)
                                 }
                             }
                         }
