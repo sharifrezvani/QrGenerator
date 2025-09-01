@@ -1,0 +1,24 @@
+{
+  "name": "qrgenerator",
+  "version": "1.0.0",
+  "description": "A comprehensive console-based QR code generator with extensive customization options.",
+  "main": "index.js",
+  "bin": {
+    "qr-gen": "./qr-generator.js"
+  },
+  "scripts": {
+    "start": "node qr-generator.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "chalk": "^4.1.2",
+    "commander": "^14.0.0",
+    "inquirer": "^8.2.6",
+    "jimp": "^1.6.0",
+    "pngjs": "^7.0.0",
+    "qrcode": "^1.5.4"
+  }
+}
